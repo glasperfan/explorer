@@ -15,6 +15,8 @@ var discardedSnippet = "discarded";
 var tradedWithSnippet = " traded with: ";
 var tradeWantsToGiveSnippet = "wants to give:";
 var tradeGiveForSnippet = "for:";
+var stoleFromYouSnippet = "stole:";
+var stoleFromSnippet = " stole  from: "; // extra space from icon
 
 var wood = "wood";
 var stone = "stone";
@@ -336,6 +338,38 @@ function parseTradedMessage(pElement, prevElement) {
     }
 }
 
+/**
+ * Message T-1: [stealingPlayer] stole [resource] from: [targetPlayer]
+ * Message T: [stealingPlayer] stole: [resource]
+ */
+function parseStoleFromYouMessage(pElement, prevElement) {
+    var textContent = pElement.textContent;
+    if (!textContent.includes(stoleFromYouSnippet)) {
+        return;
+    }
+    var involvedPlayers = prevElement.textContent.replace(stoleFromSnippet, " ").split(" ");
+    var stealingPlayer = involvedPlayers[0];
+    var targetPlayer = involvedPlayers[1];
+    if (!resources[stealingPlayer] || !resources[targetPlayer]) {
+        console.log("Failed to parse player...", stealingPlayer, targetPlayer, resources);
+        return;
+    }
+    var images = collectionToArray(pElement.getElementsByTagName('img'));
+    for (var img of images) {
+        if (img.src.includes("card_wool")) {
+            tradeResource(targetPlayer, stealingPlayer, sheep);
+        } else if (img.src.includes("card_lumber")) {
+            tradeResource(targetPlayer, stealingPlayer, wood);
+        } else if (img.src.includes("card_brick")) {
+            tradeResource(targetPlayer, stealingPlayer, brick);
+        } else if (img.src.includes("card_ore")) {
+            tradeResource(targetPlayer, stealingPlayer, stone);
+        } else if (img.src.includes("card_grain")) {
+            tradeResource(targetPlayer, stealingPlayer, wheat);
+        }
+    }
+}
+
 var ALL_PARSERS = [
     parseGotMessage,
     parseBuiltMessage,
@@ -344,6 +378,7 @@ var ALL_PARSERS = [
     parseStoleAllOfMessage,
     parseDiscardedMessage,
     parseTradedMessage,
+    parseStoleFromYouMessage,
 ];
 
 /**
