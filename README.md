@@ -1,10 +1,6 @@
 
 ## TODO Message formats
 
-* "Socha used [monopoly icon] & stole all of: [resource icon]"
-* "Sokul wants to give: ...[resource icons] for ...[resource icons]" 
-  * HAS to be followed by "Sokul traded with ..."
-* Sokul discarded: ...[resource icons]
 
 
 ## Robber

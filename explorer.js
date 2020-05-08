@@ -10,6 +10,11 @@ var builtSnippet = "built a";
 var boughtSnippet = " bought ";
 var tradeBankGaveSnippet = "gave bank:";
 var tradeBankTookSnippet = "and took";
+var stoleAllOfSnippet = "stole all of";
+var discardedSnippet = "discarded";
+var tradedWithSnippet = " traded with: ";
+var tradeWantsToGiveSnippet = "wants to give:";
+var tradeGiveForSnippet = "for:";
 
 var wood = "wood";
 var stone = "stone";
@@ -36,7 +41,6 @@ function deleteDiscordSigns() {
         }
     }
 }
-deleteDiscordSigns();
 
 
 /**
@@ -93,11 +97,12 @@ function parseGotMessage(pElement) {
     if (!textContent.includes(receivedResourcesSnippet)) {
         return;
     }
-    var images = collectionToArray(pElement.getElementsByTagName('img'));
     var player = textContent.replace(receivedResourcesSnippet, "").split(" ")[0];
     if (!resources[player]) {
         console.log("Failed to parse player...", player, resources);
+        return;
     }
+    var images = collectionToArray(pElement.getElementsByTagName('img'));
     for (var img of images) {
         if (img.src.includes("card_wool")) {
             resources[player][sheep] += 1;
@@ -125,6 +130,7 @@ function parseBuiltMessage(pElement) {
     var player = textContent.split(" ")[0];
     if (!resources[player]) {
         console.log("Failed to parse player...", player, resources);
+        return;
     }
     for (var img of images) {
         if (img.src.includes("road")) {
@@ -154,6 +160,7 @@ function parseBoughtMessage(pElement) {
     var player = textContent.split(" ")[0];
     if (!resources[player]) {
         console.log("Failed to parse player...", player, resources);
+        return;
     }
     for (var img of images) {
         if (img.src.includes("card_devcardback")) {
@@ -175,6 +182,7 @@ function parseTradeBankMessage(pElement) {
     var player = textContent.split(" ")[0];
     if (!resources[player]) {
         console.log("Failed to parse player...", player, resources);
+        return;
     }
     // We have to split on the text, which isn't wrapped in tags, so we parse innerHTML, which prints the HTML and the text.
     var innerHTML = pElement.innerHTML;
@@ -208,11 +216,134 @@ function parseTradeBankMessage(pElement) {
     }
 }
 
+function stealAllOfResource(receivingPlayer, resource) {
+    for (var plyr of players) {
+        if (plyr !== receivingPlayer) {
+            resources[receivingPlayer][resource] += resources[plyr][resource];
+            resources[plyr][resource] = 0;
+        }
+    }
+}
+
+/**
+ * Parse monopoly card ("stole all of" some resource): [user] used [monopoly icon] & stole all of: [resource icon]
+ */
+function parseStoleAllOfMessage(pElement) {
+    var textContent = pElement.textContent;
+    if (!textContent.includes(stoleAllOfSnippet)) {
+        return;
+    }
+    var player = textContent.split(" ")[0];
+    if (!resources[player]) {
+        console.log("Failed to parse player...", player, resources);
+        return;
+    }
+    var images = collectionToArray(pElement.getElementsByTagName('img'));
+    // there will only be 1 resource icon
+    for (var img of images) {
+        if (img.src.includes("card_wool")) {
+            stealAllOfResource(player, sheep);
+        } else if (img.src.includes("card_lumber")) {
+            stealAllOfResource(player, wood);
+        } else if (img.src.includes("card_brick")) {
+            stealAllOfResource(player, brick);
+        } else if (img.src.includes("card_ore")) {
+            stealAllOfResource(player, stone);
+        } else if (img.src.includes("card_grain")) {
+            stealAllOfResource(player, wheat);
+        }
+    }
+}
+
+/**
+ * When the user has to discard cards because of a robber.
+ */
+function parseDiscardedMessage(pElement) {
+    var textContent = pElement.textContent;
+    if (!textContent.includes(discardedSnippet)) {
+        return;
+    }
+    var player = textContent.replace(receivedResourcesSnippet, "").split(" ")[0];
+    if (!resources[player]) {
+        console.log("Failed to parse player...", player, resources);
+        return;
+    }
+    var images = collectionToArray(pElement.getElementsByTagName('img'));
+    for (var img of images) {
+        if (img.src.includes("card_wool")) {
+            resources[player][sheep] -= 1;
+        } else if (img.src.includes("card_lumber")) {
+            resources[player][wood] -= 1;
+        } else if (img.src.includes("card_brick")) {
+            resources[player][brick] -= 1;
+        } else if (img.src.includes("card_ore")) {
+            resources[player][stone] -= 1; 
+        } else if (img.src.includes("card_grain")) {
+            resources[player][wheat] -= 1;
+        }
+    }
+}
+
+function tradeResource(srcPlayer, destPlayer, resource, quantity = 1) {
+    resources[srcPlayer][resource] -= quantity;
+    resources[destPlayer][resource] += quantity;
+}
+
+/**
+ * Message T-1: [user1] wants to give: ...[resources] for: ...[resources]
+ * Message T: [user1] traded with: [user2]
+ */
+function parseTradedMessage(pElement, prevElement) {
+    var textContent = pElement.textContent;
+    if (!textContent.includes(tradedWithSnippet)) {
+        return;
+    }
+    var tradingPlayer = textContent.split(tradedWithSnippet)[0];
+    var agreeingPlayer = textContent.split(tradedWithSnippet)[1];
+    if (!resources[tradingPlayer] || !resources[agreeingPlayer]) {
+        console.log("Failed to parse player...", tradingPlayer, agreeingPlayer, pElement.textContent, prevElement.textContent, resources);
+        return;
+    }
+    // We have to split on the text, which isn't wrapped in tags, so we parse innerHTML, which prints the HTML and the text.
+    var innerHTML = prevElement.innerHTML; // on the trade description msg
+    var wantstogive = innerHTML.slice(innerHTML.indexOf(tradeWantsToGiveSnippet), innerHTML.indexOf(tradeGiveForSnippet)).split("<img");
+    var givefor = innerHTML.slice(innerHTML.indexOf(tradeGiveForSnippet)).split("<img");
+    for (var imgStr of wantstogive) {
+        if (imgStr.includes("card_wool")) {
+            tradeResource(tradingPlayer, agreeingPlayer, sheep);
+        } else if (imgStr.includes("card_lumber")) {
+            tradeResource(tradingPlayer, agreeingPlayer, wood);
+        } else if (imgStr.includes("card_brick")) {
+            tradeResource(tradingPlayer, agreeingPlayer, brick);
+        } else if (imgStr.includes("card_ore")) {
+            tradeResource(tradingPlayer, agreeingPlayer, stone);
+        } else if (imgStr.includes("card_grain")) {
+            tradeResource(tradingPlayer, agreeingPlayer, wheat);
+        }
+    }
+    for (var imgStr of givefor) {
+        if (imgStr.includes("card_wool")) {
+            tradeResource(agreeingPlayer, tradingPlayer, sheep);
+        } else if (imgStr.includes("card_lumber")) {
+            tradeResource(agreeingPlayer, tradingPlayer, wood);
+        } else if (imgStr.includes("card_brick")) {
+            tradeResource(agreeingPlayer, tradingPlayer, brick);
+        } else if (imgStr.includes("card_ore")) {
+            tradeResource(agreeingPlayer, tradingPlayer, stone);
+        } else if (imgStr.includes("card_grain")) {
+            tradeResource(agreeingPlayer, tradingPlayer, wheat);
+        }
+    }
+}
+
 var ALL_PARSERS = [
     parseGotMessage,
     parseBuiltMessage,
     parseBoughtMessage,
     parseTradeBankMessage,
+    parseStoleAllOfMessage,
+    parseDiscardedMessage,
+    parseTradedMessage,
 ];
 
 /**
@@ -222,7 +353,10 @@ function parseLatestMessages() {
     var allMessages = getAllMessages();
     var newOffset = allMessages.length;
     var newMessages = allMessages.slice(MSG_OFFSET);
-    ALL_PARSERS.forEach(parser => newMessages.forEach(parser));
+    ALL_PARSERS.forEach(parser => newMessages.forEach((msg, idx) => {
+        var prevMessage = idx > 0 ? newMessages[idx - 1] : allMessages[MSG_OFFSET - 1];
+        parser(msg, prevMessage);
+    }));
     MSG_OFFSET = newOffset;
     render();
 }
@@ -238,7 +372,9 @@ function tallyInitialResources() {
     var allMessages = getAllMessages();
     MSG_OFFSET = allMessages.length;
     allMessages.forEach(parseGotMessage);
+    deleteDiscordSigns();
     render();
+    deleteDiscordSigns(); // idk why but it takes 2 runs to delete both signs
     startWatchingMessages();
 }
 
