@@ -34,6 +34,12 @@ var resources = {};
 // Message offset
 var MSG_OFFSET = 0;
 
+// Thefts - transactions from when the robber is placed and stolen resource is unknown 
+var thefts = [];
+// Thefts - once the unknown resources are accounted for
+var solved_thefts = [];
+
+
 // First, delete the discord signs
 function deleteDiscordSigns() {
     var allPageImages = document.getElementsByTagName('img'); 
@@ -44,6 +50,21 @@ function deleteDiscordSigns() {
     }
 }
 
+/**
+ * Calculate the total lost quantity of a resource for a given player. 
+ * i.e. if 1 card was potentially stolen, return 1.
+ */
+function calculateTheftForPlayerAndResource(player, resourceType) {
+    return thefts.map(theft => {
+        if (theft.who.stealingPlayer === player) {
+            return theft.what[resourceType] || 0;
+        }
+        if (theft.who.targetPlayer === player) {
+            return -theft.what[resourceType] || 0;
+        }
+        return 0;
+    }).reduce((a, b) => a + b, 0);
+}
 
 /**
 * Renders the table with the counts.
@@ -81,7 +102,11 @@ function render() {
         for (var j = 0; j < resourceTypes.length; j++) {
             var cell = row.insertCell(j + 1);
             var resourceType = resourceTypes[j];
-            cell.innerHTML = "" + resources[player][resourceType];
+            var cellCount = resources[player][resourceType];
+            var theftCount = calculateTheftForPlayerAndResource(player, resourceType);
+            cell.innerHTML = theftCount === 0 
+                ? "" + resources[player][resourceType] 
+                : `${cellCount} (${cellCount + theftCount})`;
         }
     }
 
@@ -370,6 +395,109 @@ function parseStoleFromYouMessage(pElement, prevElement) {
     }
 }
 
+/**
+ * Message T-1: [stealingPlayer] stole [resource] from: [targetPlayer]
+ * Message T is NOT: [stealingPlayer] stole: [resource]
+ */
+function parseStoleUnknownMessage(pElement, prevElement) {
+    var messageT = pElement.textContent;
+    var messageTMinus1 = prevElement.textContent;
+    var matches = !messageT.includes(stoleFromYouSnippet) && messageTMinus1.includes(stoleFromSnippet);
+    if (!matches) {
+        return;
+    }
+    // figure out the 2 players
+    var involvedPlayers = prevElement.textContent.replace(stoleFromSnippet, " ").split(" ");
+    var stealingPlayer = involvedPlayers[0];
+    var targetPlayer = involvedPlayers[1];
+    if (!resources[stealingPlayer] || !resources[targetPlayer]) {
+        console.log("Failed to parse player...", stealingPlayer, targetPlayer, resources);
+        return;
+    }
+    // for the player being stolen from, (-1) on all resources that are non-zero
+    // for the player receiving, (+1) for all resources that are non-zero FOR THE OTHER PLAYER
+    // record the unknown and wait for it to surface
+    theft = {
+        who: {
+            stealingPlayer,
+            targetPlayer,
+        },
+        what: {}
+    };
+    for (var resourceType of resourceTypes) {
+        if (resources[targetPlayer][resourceType] > 0) {
+            theft.what[resourceType] = 1;
+        }
+    }
+    var resourceTypesPotentiallyStolen = Object.keys(theft.what);
+    if (resourceTypesPotentiallyStolen.length === 0) {
+        // nothing could have been stolen
+        return;
+    }
+    if (resourceTypesPotentiallyStolen.length === 1) {
+        // only 1 resource could have been stolen, so it's not an unknown
+        tradeResource(targetPlayer, stealingPlayer, resourceTypesPotentiallyStolen[0]);
+    } else {
+        // we can't be sure, so record the unknown
+        thefts.push(theft);
+    }
+}
+
+/**
+ * See if thefts can be solved based on current resource count.
+ * Rules:
+ *  - if resource count < 0, then they spent a resource they stole (what if there are multiple thefts that could account for this?)
+ *  - if resource count + theft count < 0, then we know that resource was stolen, and we can remove it from the list of potentials.
+ *     - if there's only 1 resource left, we know what was stolen in another instance.
+ */
+function reviewThefts() {
+    for (var player of players) {
+        for (var resourceType of resourceTypes) {
+            var resourceCount = resources[player][resourceType];
+            var theftCount = calculateTheftForPlayerAndResource(player, resourceType);
+            var total = resourceCount + theftCount;
+            if (total < -1) {
+                throw Error('Invalid state', resourceType, player, resourceCount, theftCount, resources);
+            }
+            // the player stole a resource and spent it
+            if (resourceCount === -1 && total === 0) {
+                for (var i = 0; i < thefts.length; i++) {
+                    if (thefts[i].who.stealingPlayer === player && !!thefts[i].what[resourceType]) {
+                        resources[player][resourceType] = 0;
+                        // the target player loses 1 of that resourceType
+                        resources[thefts[i].who.targetPlayer][resourceType] -=1;
+                        thefts[i].solved = true;
+                    }
+                }
+            }
+            // the player had a resource stolen and the stealer spent it (?)
+            if (resourceCount === 0 && total === -1) {
+                for (var i = 0; i < thefts.length; i++) {
+                    if (thefts[i].who.targetPlayer === player && !!thefts[i].what[resourceType]) {
+                        delete thefts[i].what[resourceType];
+                        console.log("Theft possibilities reduced!", thefts[i]);
+                        
+                        var remainingResourcePossibilities = Object.keys(thefts[i].what);
+                        if (remainingResourcePossibilities.length === 1) {
+                            tradeResource(
+                                thefts[i].who.targetPlayer, 
+                                thefts[i].who.stealingPlayer, 
+                                remainingResourcePossibilities[0]
+                            );
+                            thefts[i].solved = true;
+                            console.log("Theft solved!", thefts[i]);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    // Removed any solved thefts.
+    solved_thefts = solved_thefts.concat(thefts.filter(t => t.solved));
+    thefts = thefts.filter(t => !t.solved);
+}
+
 var ALL_PARSERS = [
     parseGotMessage,
     parseBuiltMessage,
@@ -379,6 +507,7 @@ var ALL_PARSERS = [
     parseDiscardedMessage,
     parseTradedMessage,
     parseStoleFromYouMessage,
+    parseStoleUnknownMessage,
 ];
 
 /**
@@ -393,6 +522,7 @@ function parseLatestMessages() {
         parser(msg, prevMessage);
     }));
     MSG_OFFSET = newOffset;
+    reviewThefts();
     render();
 }
 

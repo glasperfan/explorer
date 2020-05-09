@@ -8,13 +8,12 @@
     },
     "permissions": [
         "tabs",
-        "activeTab",
-        "https://colonist.io/*",
-        "https://hexs.io/*"
+        "https://hexs.io/*",
+        "https://colonist.io/*"
     ],
     "content_scripts": [
         {
-          "matches": ["https://colonist.io/*", "https://hexs.io/*"],
+          "matches": ["https://hexs.io/*", "https://colonist.io/*"],
           "css": ["styles.css"],
           "run_at": "document_idle",
           "js": ["explorer.js"]
