@@ -311,7 +311,7 @@ function parseDiscardedMessage(pElement) {
     }
 }
 
-function tradeResource(srcPlayer, destPlayer, resource, quantity = 1) {
+function transferResource(srcPlayer, destPlayer, resource, quantity = 1) {
     resources[srcPlayer][resource] -= quantity;
     resources[destPlayer][resource] += quantity;
 }
@@ -337,28 +337,28 @@ function parseTradedMessage(pElement, prevElement) {
     var givefor = innerHTML.slice(innerHTML.indexOf(tradeGiveForSnippet)).split("<img");
     for (var imgStr of wantstogive) {
         if (imgStr.includes("card_wool")) {
-            tradeResource(tradingPlayer, agreeingPlayer, sheep);
+            transferResource(tradingPlayer, agreeingPlayer, sheep);
         } else if (imgStr.includes("card_lumber")) {
-            tradeResource(tradingPlayer, agreeingPlayer, wood);
+            transferResource(tradingPlayer, agreeingPlayer, wood);
         } else if (imgStr.includes("card_brick")) {
-            tradeResource(tradingPlayer, agreeingPlayer, brick);
+            transferResource(tradingPlayer, agreeingPlayer, brick);
         } else if (imgStr.includes("card_ore")) {
-            tradeResource(tradingPlayer, agreeingPlayer, stone);
+            transferResource(tradingPlayer, agreeingPlayer, stone);
         } else if (imgStr.includes("card_grain")) {
-            tradeResource(tradingPlayer, agreeingPlayer, wheat);
+            transferResource(tradingPlayer, agreeingPlayer, wheat);
         }
     }
     for (var imgStr of givefor) {
         if (imgStr.includes("card_wool")) {
-            tradeResource(agreeingPlayer, tradingPlayer, sheep);
+            transferResource(agreeingPlayer, tradingPlayer, sheep);
         } else if (imgStr.includes("card_lumber")) {
-            tradeResource(agreeingPlayer, tradingPlayer, wood);
+            transferResource(agreeingPlayer, tradingPlayer, wood);
         } else if (imgStr.includes("card_brick")) {
-            tradeResource(agreeingPlayer, tradingPlayer, brick);
+            transferResource(agreeingPlayer, tradingPlayer, brick);
         } else if (imgStr.includes("card_ore")) {
-            tradeResource(agreeingPlayer, tradingPlayer, stone);
+            transferResource(agreeingPlayer, tradingPlayer, stone);
         } else if (imgStr.includes("card_grain")) {
-            tradeResource(agreeingPlayer, tradingPlayer, wheat);
+            transferResource(agreeingPlayer, tradingPlayer, wheat);
         }
     }
 }
@@ -382,15 +382,15 @@ function parseStoleFromYouMessage(pElement, prevElement) {
     var images = collectionToArray(pElement.getElementsByTagName('img'));
     for (var img of images) {
         if (img.src.includes("card_wool")) {
-            tradeResource(targetPlayer, stealingPlayer, sheep);
+            transferResource(targetPlayer, stealingPlayer, sheep);
         } else if (img.src.includes("card_lumber")) {
-            tradeResource(targetPlayer, stealingPlayer, wood);
+            transferResource(targetPlayer, stealingPlayer, wood);
         } else if (img.src.includes("card_brick")) {
-            tradeResource(targetPlayer, stealingPlayer, brick);
+            transferResource(targetPlayer, stealingPlayer, brick);
         } else if (img.src.includes("card_ore")) {
-            tradeResource(targetPlayer, stealingPlayer, stone);
+            transferResource(targetPlayer, stealingPlayer, stone);
         } else if (img.src.includes("card_grain")) {
-            tradeResource(targetPlayer, stealingPlayer, wheat);
+            transferResource(targetPlayer, stealingPlayer, wheat);
         }
     }
 }
@@ -436,7 +436,7 @@ function parseStoleUnknownMessage(pElement, prevElement) {
     }
     if (resourceTypesPotentiallyStolen.length === 1) {
         // only 1 resource could have been stolen, so it's not an unknown
-        tradeResource(targetPlayer, stealingPlayer, resourceTypesPotentiallyStolen[0]);
+        transferResource(targetPlayer, stealingPlayer, resourceTypesPotentiallyStolen[0]);
     } else {
         // we can't be sure, so record the unknown
         thefts.push(theft);
@@ -463,9 +463,7 @@ function reviewThefts() {
             if (resourceCount === -1 && total === 0) {
                 for (var i = 0; i < thefts.length; i++) {
                     if (thefts[i].who.stealingPlayer === player && !!thefts[i].what[resourceType]) {
-                        resources[player][resourceType] = 0;
-                        // the target player loses 1 of that resourceType
-                        resources[thefts[i].who.targetPlayer][resourceType] -=1;
+                        transferResource(thefts[i].who.targetPlayer, player, resourceType);
                         thefts[i].solved = true;
                     }
                 }
@@ -479,7 +477,7 @@ function reviewThefts() {
                         
                         var remainingResourcePossibilities = Object.keys(thefts[i].what);
                         if (remainingResourcePossibilities.length === 1) {
-                            tradeResource(
+                            transferResource(
                                 thefts[i].who.targetPlayer, 
                                 thefts[i].who.stealingPlayer, 
                                 remainingResourcePossibilities[0]
