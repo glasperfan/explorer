@@ -400,6 +400,9 @@ function parseStoleFromYouMessage(pElement, prevElement) {
  * Message T is NOT: [stealingPlayer] stole: [resource]
  */
 function parseStoleUnknownMessage(pElement, prevElement) {
+    if (!prevElement) {
+        return;
+    }
     var messageT = pElement.textContent;
     var messageTMinus1 = prevElement.textContent;
     var matches = !messageT.includes(stoleFromYouSnippet) && messageTMinus1.includes(stoleFromSnippet);
@@ -446,6 +449,7 @@ function parseStoleUnknownMessage(pElement, prevElement) {
 /**
  * See if thefts can be solved based on current resource count.
  * Rules:
+ *  
  *  - if resource count < 0, then they spent a resource they stole (what if there are multiple thefts that could account for this?)
  *  - if resource count + theft count < 0, then we know that resource was stolen, and we can remove it from the list of potentials.
  *     - if there's only 1 resource left, we know what was stolen in another instance.
@@ -473,7 +477,7 @@ function reviewThefts() {
                 for (var i = 0; i < thefts.length; i++) {
                     if (thefts[i].who.targetPlayer === player && !!thefts[i].what[resourceType]) {
                         delete thefts[i].what[resourceType];
-                        console.log("Theft possibilities reduced!", thefts[i]);
+                        console.log("Theft possibilities reduced!", thefts[i], resourceType);
                         
                         var remainingResourcePossibilities = Object.keys(thefts[i].what);
                         if (remainingResourcePossibilities.length === 1) {
@@ -487,6 +491,27 @@ function reviewThefts() {
                         }
                         break;
                     }
+                }
+            }
+        }
+    }
+    // Remove if we can solve based on there being no resources of that type in play
+    for (var resourceType of resourceTypes) {
+        var resourceTotalInPlay = Object.values(resources).map(r => r[resourceType]).reduce((a, b) => a + b, 0);
+        if (resourceTotalInPlay === 0) {
+            for (var i = 0; i < thefts.length; i++) {
+                if (thefts[i].solved) {
+                    continue;
+                }
+                delete thefts[i].what[resourceType];
+                var remainingOptions = Object.keys(thefts[i].what);
+                if (remainingOptions === 1) {
+                    transferResource(
+                        thefts[i].who.targetPlayer, 
+                        thefts[i].who.stealingPlayer, 
+                        remainingOptions[0]
+                    );
+                    thefts[i].solved = true;
                 }
             }
         }
@@ -564,6 +589,15 @@ function recognizeUsers() {
         }
     }
     console.log(resources);
+}
+
+function clearResources() {
+    for (var player of players) {
+        resources[player] = {};
+        for (var resourceType of resourceTypes) {
+            resources[player][resourceType] = 0;
+        }
+    }
 }
 
 function loadCounter() {
