@@ -1,18 +1,20 @@
 {
-    "name": "Explorer",
+    "name": "Colonist Resource Tracker",
+    "short_name": "Colonist Resource Tracker",
     "manifest_version": 2,
-    "description": "Track players' resources on colonist.io",
-    "version": "0.1.0",
+    "author": "Hugh Zabriskie",
+    "description": "Players of Catan on colonist.io can track who has which resources",
+    "version": "0.0.1",
     "icons": {
         "64": "icon64.png"
     },
     "permissions": [
-        "https://hexs.io/*",
-        "https://colonist.io/*"
+        "https://colonist.io/*",
+        "https://hexs.io/*"
     ],
     "content_scripts": [
         {
-          "matches": ["https://hexs.io/*", "https://colonist.io/*"],
+          "matches": ["https://colonist.io/*", "https://hexs.io/*"],
           "css": ["styles.css"],
           "run_at": "document_idle",
           "js": ["explorer.js"]

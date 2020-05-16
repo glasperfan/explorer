@@ -27,6 +27,7 @@ var resourceTypes = [wood, stone, wheat, brick, sheep];
 
 // Players
 var players = [];
+var player_colors = {}; // player -> hex
 
 // Per player per resource
 var resources = {};
@@ -48,6 +49,14 @@ function deleteDiscordSigns() {
             allPageImages[i].remove();
         }
     }
+    ad_left = document.getElementById("in-game-ad-left");
+    if (ad_left) {
+        ad_left.remove();
+    }
+    ad_right = document.getElementById("in-game-ad-right");
+    if (ad_right) {
+        ad_right.remove();
+    }
 }
 
 /**
@@ -66,10 +75,45 @@ function calculateTheftForPlayerAndResource(player, resourceType) {
     }).reduce((a, b) => a + b, 0);
 }
 
+function getResourceImg(resourceType) {
+    var img_name = "";
+    switch (resourceType) {
+        case wheat:
+            img_name = "card_grain";
+            break;
+        case stone:
+            img_name = "card_ore";
+            break;
+        case sheep:
+            img_name = "card_wool";
+            break;
+        case brick:
+            img_name = "card_brick";
+            break;
+        case wood:
+            img_name = "card_lumber";
+            break;
+    }
+    if (!img_name.length) throw Error("Couldn't find resource image icon");
+    return `<img src="https://colonist.io/dist/images/${img_name}.svg" class="explorer-tbl-resource-icon" />`
+}
+
+function renderPlayerCell(player) {
+    return `
+        <div class="explorer-tbl-player-col-cell-color" style="background-color:${player_colors[player]}"></div>
+        <span class="explorer-tbl-player-name" style="color:${player_colors[player]}">${player}</span>
+    `;
+}
+
 /**
 * Renders the table with the counts.
 */
+var render_cache = null;
 function render() {
+    if (JSON.stringify(resources) === JSON.stringify(render_cache)) {
+        return;
+    }
+    render_cache = resources;
     var existingTbl = document.getElementById("explorer");
     try {
         if (existingTbl) {
@@ -80,27 +124,36 @@ function render() {
     }
     var body = document.getElementsByTagName("body")[0];
     var tbl = document.createElement("table");
-    tbl.id = "explorer";
+    tbl.setAttribute("cellspacing", 0);
+    tbl.setAttribute("cellpadding", 0);
+    tbl.id = "explorer-tbl";
     
     // Header row - one column per resource, plus player column
     var header = tbl.createTHead();
+    header.className = "explorer-tbl-header";
     var headerRow = header.insertRow(0);
     var playerHeaderCell = headerRow.insertCell(0);
-    playerHeaderCell.innerHTML = "<b>Player</b>";
+    playerHeaderCell.innerHTML = "Name";
+    playerHeaderCell.className = "explorer-tbl-player-col-header";
     for (var i = 0; i < resourceTypes.length; i++) {
         var resourceType = resourceTypes[i];
         var resourceHeaderCell = headerRow.insertCell(i + 1);
-        resourceHeaderCell.innerHTML = resourceType;
+        resourceHeaderCell.className = "explorer-tbl-cell";
+        resourceHeaderCell.innerHTML = getResourceImg(resourceType);
     }
-
+    
+    var tblBody = tbl.createTBody();
     // Row per player
     for (var i = 0; i < players.length; i++) {
         var player = players[i];
-        var row = tbl.insertRow(i + 1); // +1, after header row
+        var row = tblBody.insertRow(i);
+        row.className = "explorer-tbl-row";
         var playerRowCell = row.insertCell(0);
-        playerRowCell.innerHTML = player;
+        playerRowCell.className = "explorer-tbl-player-col-cell";
+        playerRowCell.innerHTML = renderPlayerCell(player);
         for (var j = 0; j < resourceTypes.length; j++) {
             var cell = row.insertCell(j + 1);
+            cell.className = "explorer-tbl-cell";
             var resourceType = resourceTypes[j];
             var cellCount = resources[player][resourceType];
             var theftCount = calculateTheftForPlayerAndResource(player, resourceType);
@@ -571,14 +624,15 @@ function tallyInitialResources() {
 */
 function recognizeUsers() {
     var placementMessages = getAllMessages()
-    .map(p => p.textContent)
-    .filter(msg => msg.includes(placeInitialSettlementSnippet));
+    .filter(msg => msg.textContent.includes(placeInitialSettlementSnippet));
     console.log("total placement messages", placementMessages.length);
     for (var msg of placementMessages) {
-        username = msg.replace(placeInitialSettlementSnippet, "").split(" ")[0];
+        msg_text = msg.textContent;
+        username = msg_text.replace(placeInitialSettlementSnippet, "").split(" ")[0];
         console.log(username);
         if (!resources[username]) {
             players.push(username);
+            player_colors[username] = msg.style.color;
             resources[username] = {
                 [wood]: 0,
                 [stone]: 0,
@@ -588,7 +642,6 @@ function recognizeUsers() {
             };
         }
     }
-    console.log(resources);
 }
 
 function clearResources() {
