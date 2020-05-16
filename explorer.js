@@ -107,10 +107,11 @@ function renderPlayerCell(player) {
 
 var render_cache = null;
 function shouldRenderTable(...deps) {
-    if (JSON.stringify(deps) === JSON.stringify(render_cache)) {
+    if (JSON.stringify(deps) === render_cache) {
         return false;
     }
     render_cache = JSON.stringify(deps);
+    console.log("Will render...");
     return true;
 }
 
@@ -122,7 +123,7 @@ function render() {
         return;
     }
 
-    var existingTbl = document.getElementById("explorer");
+    var existingTbl = document.getElementById("explorer-tbl");
     try {
         if (existingTbl) {
             existingTbl.remove();
