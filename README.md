@@ -1,6 +1,8 @@
 
 # Explorer
 
+![image](https://user-images.githubusercontent.com/6545534/82131862-63e88b00-979f-11ea-97a7-f251fc1c7e50.png)
+
 Explorer parses the game transaction log in colonist.io to keep track of which player has which resources. 
 No data is used to determine this that isn't clearly visible in the game. That said, it is at your own
 discretion whether using this tool is cheating.
