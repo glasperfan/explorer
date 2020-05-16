@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
 * {
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Roboto', sans-serif;
 }
 
 
@@ -29,9 +29,8 @@
     height: 3em;
 }
 
-.explorer-tbl-row:nth-child(2n-1) {
-    background-color: #eee;
-}
+.explorer-tbl-row:nth-child(2n-1) { background-color: #eeeeee; }
+.explorer-tbl-row:nth-child(2n) { background-color: #f9f9f9; }
 
 .explorer-tbl-cell {
     border: none;
