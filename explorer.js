@@ -27,6 +27,7 @@ var resourceTypes = [wood, stone, wheat, brick, sheep];
 
 // Players
 var players = [];
+var player_colors = {}; // player -> hex
 
 // Per player per resource
 var resources = {};
@@ -48,6 +49,14 @@ function deleteDiscordSigns() {
             allPageImages[i].remove();
         }
     }
+    ad_left = document.getElementById("in-game-ad-left");
+    if (ad_left) {
+        ad_left.remove();
+    }
+    ad_right = document.getElementById("in-game-ad-right");
+    if (ad_right) {
+        ad_right.remove();
+    }
 }
 
 /**
@@ -66,11 +75,55 @@ function calculateTheftForPlayerAndResource(player, resourceType) {
     }).reduce((a, b) => a + b, 0);
 }
 
+function getResourceImg(resourceType) {
+    var img_name = "";
+    switch (resourceType) {
+        case wheat:
+            img_name = "card_grain";
+            break;
+        case stone:
+            img_name = "card_ore";
+            break;
+        case sheep:
+            img_name = "card_wool";
+            break;
+        case brick:
+            img_name = "card_brick";
+            break;
+        case wood:
+            img_name = "card_lumber";
+            break;
+    }
+    if (!img_name.length) throw Error("Couldn't find resource image icon");
+    return `<img src="https://colonist.io/dist/images/${img_name}.svg" class="explorer-tbl-resource-icon" />`
+}
+
+function renderPlayerCell(player) {
+    return `
+        <div class="explorer-tbl-player-col-cell-color" style="background-color:${player_colors[player]}"></div>
+        <span class="explorer-tbl-player-name" style="color:${player_colors[player]}">${player}</span>
+    `;
+}
+
+var render_cache = null;
+function shouldRenderTable(...deps) {
+    if (JSON.stringify(deps) === render_cache) {
+        return false;
+    }
+    render_cache = JSON.stringify(deps);
+    console.log("Will render...");
+    return true;
+}
+
 /**
 * Renders the table with the counts.
 */
 function render() {
-    var existingTbl = document.getElementById("explorer");
+    if (!shouldRenderTable(resources, thefts)) {
+        return;
+    }
+
+    var existingTbl = document.getElementById("explorer-tbl");
     try {
         if (existingTbl) {
             existingTbl.remove();
@@ -80,27 +133,36 @@ function render() {
     }
     var body = document.getElementsByTagName("body")[0];
     var tbl = document.createElement("table");
-    tbl.id = "explorer";
+    tbl.setAttribute("cellspacing", 0);
+    tbl.setAttribute("cellpadding", 0);
+    tbl.id = "explorer-tbl";
     
     // Header row - one column per resource, plus player column
     var header = tbl.createTHead();
+    header.className = "explorer-tbl-header";
     var headerRow = header.insertRow(0);
     var playerHeaderCell = headerRow.insertCell(0);
-    playerHeaderCell.innerHTML = "<b>Player</b>";
+    playerHeaderCell.innerHTML = "Name";
+    playerHeaderCell.className = "explorer-tbl-player-col-header";
     for (var i = 0; i < resourceTypes.length; i++) {
         var resourceType = resourceTypes[i];
         var resourceHeaderCell = headerRow.insertCell(i + 1);
-        resourceHeaderCell.innerHTML = resourceType;
+        resourceHeaderCell.className = "explorer-tbl-cell";
+        resourceHeaderCell.innerHTML = getResourceImg(resourceType);
     }
-
+    
+    var tblBody = tbl.createTBody();
     // Row per player
     for (var i = 0; i < players.length; i++) {
         var player = players[i];
-        var row = tbl.insertRow(i + 1); // +1, after header row
+        var row = tblBody.insertRow(i);
+        row.className = "explorer-tbl-row";
         var playerRowCell = row.insertCell(0);
-        playerRowCell.innerHTML = player;
+        playerRowCell.className = "explorer-tbl-player-col-cell";
+        playerRowCell.innerHTML = renderPlayerCell(player);
         for (var j = 0; j < resourceTypes.length; j++) {
             var cell = row.insertCell(j + 1);
+            cell.className = "explorer-tbl-cell";
             var resourceType = resourceTypes[j];
             var cellCount = resources[player][resourceType];
             var theftCount = calculateTheftForPlayerAndResource(player, resourceType);
@@ -400,6 +462,9 @@ function parseStoleFromYouMessage(pElement, prevElement) {
  * Message T is NOT: [stealingPlayer] stole: [resource]
  */
 function parseStoleUnknownMessage(pElement, prevElement) {
+    if (!prevElement) {
+        return;
+    }
     var messageT = pElement.textContent;
     var messageTMinus1 = prevElement.textContent;
     var matches = !messageT.includes(stoleFromYouSnippet) && messageTMinus1.includes(stoleFromSnippet);
@@ -446,6 +511,7 @@ function parseStoleUnknownMessage(pElement, prevElement) {
 /**
  * See if thefts can be solved based on current resource count.
  * Rules:
+ *  
  *  - if resource count < 0, then they spent a resource they stole (what if there are multiple thefts that could account for this?)
  *  - if resource count + theft count < 0, then we know that resource was stolen, and we can remove it from the list of potentials.
  *     - if there's only 1 resource left, we know what was stolen in another instance.
@@ -473,7 +539,7 @@ function reviewThefts() {
                 for (var i = 0; i < thefts.length; i++) {
                     if (thefts[i].who.targetPlayer === player && !!thefts[i].what[resourceType]) {
                         delete thefts[i].what[resourceType];
-                        console.log("Theft possibilities reduced!", thefts[i]);
+                        console.log("Theft possibilities reduced!", thefts[i], resourceType);
                         
                         var remainingResourcePossibilities = Object.keys(thefts[i].what);
                         if (remainingResourcePossibilities.length === 1) {
@@ -487,6 +553,27 @@ function reviewThefts() {
                         }
                         break;
                     }
+                }
+            }
+        }
+    }
+    // Remove if we can solve based on there being no resources of that type in play
+    for (var resourceType of resourceTypes) {
+        var resourceTotalInPlay = Object.values(resources).map(r => r[resourceType]).reduce((a, b) => a + b, 0);
+        if (resourceTotalInPlay === 0) {
+            for (var i = 0; i < thefts.length; i++) {
+                if (thefts[i].solved) {
+                    continue;
+                }
+                delete thefts[i].what[resourceType];
+                var remainingOptions = Object.keys(thefts[i].what);
+                if (remainingOptions === 1) {
+                    transferResource(
+                        thefts[i].who.targetPlayer, 
+                        thefts[i].who.stealingPlayer, 
+                        remainingOptions[0]
+                    );
+                    thefts[i].solved = true;
                 }
             }
         }
@@ -546,14 +633,15 @@ function tallyInitialResources() {
 */
 function recognizeUsers() {
     var placementMessages = getAllMessages()
-    .map(p => p.textContent)
-    .filter(msg => msg.includes(placeInitialSettlementSnippet));
+    .filter(msg => msg.textContent.includes(placeInitialSettlementSnippet));
     console.log("total placement messages", placementMessages.length);
     for (var msg of placementMessages) {
-        username = msg.replace(placeInitialSettlementSnippet, "").split(" ")[0];
+        msg_text = msg.textContent;
+        username = msg_text.replace(placeInitialSettlementSnippet, "").split(" ")[0];
         console.log(username);
         if (!resources[username]) {
             players.push(username);
+            player_colors[username] = msg.style.color;
             resources[username] = {
                 [wood]: 0,
                 [stone]: 0,
@@ -563,7 +651,15 @@ function recognizeUsers() {
             };
         }
     }
-    console.log(resources);
+}
+
+function clearResources() {
+    for (var player of players) {
+        resources[player] = {};
+        for (var resourceType of resourceTypes) {
+            resources[player][resourceType] = 0;
+        }
+    }
 }
 
 function loadCounter() {

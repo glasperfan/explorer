@@ -1,6 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
-#explorer {
+* {
+    font-family: 'Roboto', sans-serif;
+}
+
+
+#explorer-tbl {
     position: absolute;
     background-color: white;
     z-index: 9999;
+    top: 10px;
+    left: 10px;
+    padding: 3px;
+    border: none;
+}
+
+.explorer-tbl-header {
+    border: none;
+
+}
+
+.explorer-tbl-header .explorer-tbl-cell {
+    padding: 4px 7px 2px; /* default override cell padding */
+}
+
+.explorer-tbl-row {
+    border: none;
+    height: 3em;
+}
+
+.explorer-tbl-row:nth-child(2n-1) { background-color: #eeeeee; }
+.explorer-tbl-row:nth-child(2n) { background-color: #f9f9f9; }
+
+.explorer-tbl-cell {
+    border: none;
+    box-sizing: unset;
+    padding: 0 2px;
+    text-align: center;
+    line-height: 3em;
+    vertical-align: top;
+}
+
+.explorer-tbl-player-col-cell {
+    border: none;
+    display: inline-flex;
+    padding: 0;
+    line-height: 3em;
+}
+
+.explorer-tbl-player-col-cell-color {
+    width: 6px;
+    background-color: #000;
+    display: inline-block;
+}
+
+.explorer-tbl-player-name {
+    margin: 0px 10px 0 4px;
+}
+
+.explorer-tbl-player-col-header {
+    font-weight: 600;
+    text-transform: uppercase;
+    border: none;
+    padding-left: 10px; /* width of cell-color + margin-left of player-name */
+    font-size: 85%;
+}
+
+.explorer-tbl-resource-icon {
+    width: 24px;
+    height: 36px;
 }
