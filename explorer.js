@@ -105,15 +105,23 @@ function renderPlayerCell(player) {
     `;
 }
 
+var render_cache = null;
+function shouldRenderTable(...deps) {
+    if (JSON.stringify(deps) === JSON.stringify(render_cache)) {
+        return false;
+    }
+    render_cache = JSON.stringify(deps);
+    return true;
+}
+
 /**
 * Renders the table with the counts.
 */
-var render_cache = null;
 function render() {
-    if (JSON.stringify(resources) === JSON.stringify(render_cache)) {
+    if (!shouldRenderTable(resources, thefts)) {
         return;
     }
-    render_cache = resources;
+
     var existingTbl = document.getElementById("explorer");
     try {
         if (existingTbl) {
